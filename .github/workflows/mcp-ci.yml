@@ -1,0 +1,28 @@
+name: MCP Server CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "mcp_server/**"
+      - ".github/workflows/mcp-ci.yml"
+  pull_request:
+    paths:
+      - "mcp_server/**"
+      - ".github/workflows/mcp-ci.yml"
+
+jobs:
+  test-mcp:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mcp_server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install MCP SDK
+        run: pip install -r requirements.txt
+      - name: Compile server
+        run: python -m py_compile server.py market_data.py analysis.py news.py
