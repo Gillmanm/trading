@@ -1,33 +1,76 @@
-# Trading Analysis Pro (React Edition)
+# Trading Analysis Pro
 
-Advanced institutional trading analysis dashboard built with React, TypeScript, Vite, and Tailwind CSS. Features Smart Money Concepts (SMC), Inner Circle Trader (ICT), Candle Range Theory (CRT), deterministic quantitative signal engine, live interactive TradingView chart, risk management calculations, news filters, and paper trade execution.
+React + TypeScript trading analysis dashboard with TradingView, SMC/ICT/CRT analysis, market news, risk management, paper trading, and a Gemini 2.5 Flash AI bridge.
 
-## Features
+## Stack
 
-- **Interactive Live Chart**: Full integration with the TradingView widget supporting multi-timeframe navigation (`5m`, `15m`, `1H`, `4H`, `1D`) with an adaptive canvas fallback.
-- **Deterministic SMC / ICT Structure**: Real-time evaluation of:
-  - Break of Structure (BOS)
-  - Order Blocks (OB)
-  - Fair Value Gaps (FVG)
-  - Liquidity Sweeps (Buy-side / Sell-side)
-  - Change of Character (MSS / CHoCH)
-  - Optimal Trade Entry (OTE Discount vs. Premium zones 61.8%–79%)
-- **CRT & Price Action Model**: Candle Range Theory expansion/contraction cycles, manipulation (Judas swings), and engulfing/pin-bar pattern scans.
-- **Signal Engine**: Deterministic Entry, Stop Loss, Take Profit 1 (1.5R), Take Profit 2 (2.5R), and multi-factor confluence scoring.
-- **Risk Manager**: Account balance position sizing based on strict risk-of-ruin protocols (0.5%–2.0%).
-- **Paper Trading Ledger**: In-app execution and PnL simulation with persistent storage.
-- **Market News Intelligence**: High-impact news event monitoring and volatility adjustment.
-- **Pine Script v6**: Embedded Pine Script strategy for TradingView alerts and webhooks.
+- React + Vite + TypeScript + Tailwind
+- TradingView chart/Pine alerts
+- Python FastAPI backend on Render
+- Gemini 2.5 Flash for AI confirmation
+- MT5 signal polling endpoint
+- Deterministic local SMC/ICT/CRT engine remains available as a fallback
 
-## Development
+## AI flow
+
+TradingView chart -> `/webhook/tradingview` -> Gemini 2.5 Flash -> BUY/SELL/WAIT -> `/api/mt5/signal` -> MT5 EA.
+
+The backend keeps the Gemini API key server-side. Never put `GEMINI_API_KEY` in React or Pine Script.
+
+## Render
+
+The Render service should use:
+
+```text
+Build: pip install -r mcp_server/requirements.txt
+Start: uvicorn mcp_server.server:app --host 0.0.0.0 --port $PORT
+Health: /health
+```
+
+Required Render environment variables:
+
+```text
+GEMINI_API_KEY=<your Gemini API key>
+GEMINI_MODEL=gemini-2.5-flash
+AI_MIN_CONFIDENCE=75
+TRADINGVIEW_WEBHOOK_SECRET=<your secret>
+MT5_API_SECRET=<your secret>
+```
+
+## TradingView
+
+Open `ai_scalper.pine` in TradingView Pine Editor. Add it to the chart, then create an alert using the script. Use the Render webhook URL:
+
+```text
+https://trading-analysis-mcp.onrender.com/webhook/tradingview
+```
+
+The webhook payload includes the current chart values and M5/M15 context. The backend asks Gemini for a structured signal.
+
+## MT5
+
+The backend exposes:
+
+```text
+GET https://trading-analysis-mcp.onrender.com/api/mt5/signal
+```
+
+Send `X-API-Key: <MT5_API_SECRET>` when the secret is configured. The EA should validate symbol, spread, confidence, SL/TP direction, risk/reward and position limits before execution.
+
+## Local development
 
 ```bash
-# Install dependencies
 npm install
-
-# Start Vite dev server on port 3000
 npm run dev
-
-# Build for production
-npm run build
 ```
+
+Backend:
+
+```bash
+pip install -r mcp_server/requirements.txt
+uvicorn mcp_server.server:app --reload --port 8000
+```
+
+## Security
+
+The Gemini key supplied in chat has been exposed and should be revoked/rotated in Google AI Studio before production use. Add the replacement only as a Render environment secret; do not commit it to GitHub.
