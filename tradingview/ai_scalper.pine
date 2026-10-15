@@ -1,0 +1,40 @@
+//@version=6
+indicator("AI Scalper Bridge", overlay=true, max_labels_count=100)
+
+apiSecret = input.string("CHANGE_ME", "Webhook Secret")
+minConfidence = input.float(75, "AI Minimum Confidence", minval=0, maxval=100)
+useSession = input.bool(false, "Use Session Filter")
+sessionInput = input.session("0700-1800", "Trading Session")
+
+inSession = not useSession or not na(time(timeframe.period, sessionInput))
+
+// Simple deterministic context. The Python API performs the deeper ICT/SMC analysis.
+emaFast = ta.ema(close, 20)
+emaSlow = ta.ema(close, 50)
+rsi = ta.rsi(close, 14)
+atr = ta.atr(14)
+
+bull = close > emaFast and emaFast > emaSlow and rsi > 50
+bear = close < emaFast and emaFast < emaSlow and rsi < 50
+
+plot(emaFast, "EMA 20")
+plot(emaSlow, "EMA 50")
+
+// These alerts are transport events. The API decides BUY/SELL/WAIT.
+longCandidate = bull and inSession
+shortCandidate = bear and inSession
+
+alertcondition(longCandidate, "AI Long Candidate", "AI_LONG")
+alertcondition(shortCandidate, "AI Short Candidate", "AI_SHORT")
+
+if longCandidate
+    label.new(bar_index, low, "AI LONG CANDIDATE", style=label.style_label_up, textcolor=color.white)
+
+if shortCandidate
+    label.new(bar_index, high, "AI SHORT CANDIDATE", style=label.style_label_down, textcolor=color.white)
+
+// Create a JSON payload for a TradingView alert. Create the alert using
+// "Any alert() function call" and set the webhook URL to your Render endpoint.
+if longCandidate or shortCandidate
+    payload = '{"secret":"' + apiSecret + '","symbol":"' + syminfo.tickerid + '","timeframe":"' + timeframe.period + '","price":' + str.tostring(close) + ',"candles":[],"indicators":{"ema20":' + str.tostring(emaFast) + ',"ema50":' + str.tostring(emaSlow) + ',"rsi":' + str.tostring(rsi) + ',"atr":' + str.tostring(atr) + '},"market_context":{"candidate":"' + (longCandidate ? "BUY" : "SELL") + '"}}'
+    alert(payload, alert.freq_once_per_bar_close)
